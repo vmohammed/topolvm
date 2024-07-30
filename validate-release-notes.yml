@@ -1,0 +1,20 @@
+name: Elekta Platform Longhorn validate release notes
+
+trigger: none
+
+resources:
+  repositories:
+    - repository: buildSupport
+      type: git
+      name: platform/build-support
+  containers:
+    - container: pipeline-validation
+      image: epgcr.azurecr.io/pipeline-validation:1.0.3
+      endpoint: epgcr
+
+pool: elekta-platform-azure-eastus-containers
+container: pipeline-validation
+
+steps:
+  - checkout: buildSupport
+  - template: /src/templates/validate-release-notes.yml@buildSupport

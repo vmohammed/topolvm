@@ -1,0 +1,73 @@
+---
+# GitVersion will update the Build.BuildNumber variable.
+#
+trigger:
+  - main
+
+resources:
+  repositories:
+    - repository: buildSupport
+      type: git
+      name: platform/build-support
+  containers:
+    - container: dotnet-core-build
+      image: epgcr.azurecr.io/dotnet-core-build:1.2.0
+      endpoint: epgcr
+
+variables:
+  - group: platform_pipeline_common
+
+pool: elekta-platform-azure-eastus-containers
+
+jobs:
+  - job: PackageAndPushHelmChart
+    pool: elekta-platform-azure-eastus-containers
+    container: dotnet-core-build
+    steps:
+      - template: /src/templates/determine-version.yml@buildSupport
+
+      - task: HelmInstaller@1
+        displayName: "Install Helm $(helmVersion)"
+        inputs:
+          helmVersionToInstall: "$(helmVersion)"
+
+      - task: AzureCLI@1
+        displayName: "Configure Helm Repository"
+        inputs:
+          azureSubscription: "$(azureSubscription)"
+          scriptLocation: "inlineScript"
+          inlineScript: |
+            az configure --defaults acr=$(containerRegistryConnection)
+            az acr helm repo add
+
+      - template: /src/templates/container-registry-login.yml@buildSupport
+
+      - script: |
+          helm dependency update src/charts/elekta-platform-topolvm/
+          helm package src/charts/elekta-platform-topolvm/ --version $(Build.BuildNumber) -d $(Build.ArtifactStagingDirectory)
+
+        displayName: Package chart
+
+      - task: AzureCLI@1
+        displayName: "Push chart package to Helm repository"
+        inputs:
+          azureSubscription: "$(azureSubscription)"
+          scriptLocation: "inlineScript"
+          inlineScript: |
+            az acr helm push $(Build.ArtifactStagingDirectory)/elekta-platform-topolvm-$(Build.BuildNumber).tgz > $(Build.ArtifactStagingDirectory)/aahp.out 2>&1
+            rc=$?
+            cat $(Build.ArtifactStagingDirectory)/aahp.out
+            if [[ $rc -ne 0 ]]; then
+              grep -i "You have tried to upload a chart that already exists" $(Build.ArtifactStagingDirectory)/aahp.out
+              if [[ $? -eq 0 ]]; then  # Push failed as chart already exists
+                # Check if chart really exists
+                sleep 90  # Give some more time for Azure eventual consistency
+                helm repo update
+                helm search repo $(containerRegistryConnection)/elekta-platform-topolvm --version $(Build.BuildNumber) | grep "$(Build.BuildNumber)"
+                rc=$?
+                if [[ $rc -ne 0 ]]; then
+                  echo "ERROR: The chart does not exist as reported by the push command!!!"
+                fi
+              fi
+            fi
+            exit $rc

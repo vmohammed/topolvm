@@ -1,0 +1,6 @@
+mode: Mainline
+branches:
+  main:
+    regex: ^(release\/.+)|(main)$
+  pull-request:
+    tag: pr

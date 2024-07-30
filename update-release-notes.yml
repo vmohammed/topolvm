@@ -1,0 +1,33 @@
+name: Elekta Platform Longhorn update release notes
+
+trigger: none
+
+variables:
+  SourceBranchName: $[replace(variables['System.PullRequest.SourceBranch'], 'refs/heads/', '')]
+
+resources:
+  repositories:
+    - repository: buildSupport
+      type: git
+      name: platform/build-support
+  containers:
+    - container: dotnet-core-build
+      image: epgcr.azurecr.io/dotnet-core-build:1.2.0
+      endpoint: epgcr
+
+pool: elekta-platform-azure-eastus-containers
+container: dotnet-core-build
+
+steps:
+  - checkout: self
+    path: s
+    persistCredentials: true
+
+  - ${{ if eq(variables['Build.Reason'], 'PullRequest') }}:
+    - template: /src/templates/auto-release-notes.yml@buildSupport
+      parameters:
+        accessToken: $(System.AccessToken)
+        pullRequestId: $(System.PullRequest.PullRequestId)
+        pullRequestSourceBranch: $(SourceBranchName)
+        localReleaseNotesPath: docs/documentation/release_notes.md
+        buildDefinitionName: "elekta.platform.longhorn"

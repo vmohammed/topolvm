@@ -1,0 +1,25 @@
+apiVersion: v2
+appVersion: 0.30.0
+description: Platform Storage - Elekta Platform TopoLVM
+keywords:
+- TopoLVM
+- Topolvm
+- topolvm
+name: elekta-platform-topolvm
+version: 1.3.2
+dependencies:
+  - name: topolvm
+    repository: oci://epgthirdpartyprod.azurecr.io/topolvm
+    version: 15.0.0
+annotations:
+  elekta.com/chartMetadata: |
+    packagingValues: ~
+    chartRepos:
+      - chartName: minio
+        repo: https://topolvm.github.io/topolvm
+    chartImages:
+      - chartName: minio
+        images:
+          - external: "ghcr.io/topolvm/topolvm-with-sidecar:0.30.0"
+    reportedVulnerabilities: []
+
